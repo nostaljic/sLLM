@@ -1,0 +1,73 @@
+
+import os
+from langchain import LLMChain
+from langchain.prompts import PromptTemplate
+from langchain.llms import HuggingFaceHub
+from langchain.chains.summarize import load_summarize_chain
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.chains import ConversationChain
+from langchain.llms import HuggingFacePipeline
+from langchain.embeddings import HuggingFaceEmbeddings
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from langchain.memory import ConversationBufferWindowMemory
+from langchain.llms.bedrock import Bedrock
+from langchain.chains import ConversationalRetrievalChain
+from langchain.indexes import VectorstoreIndexCreator
+from langchain.vectorstores import FAISS
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.document_loaders import PyPDFLoader
+
+os.environ['HF_HOME'] = 'D:/Users/Scorpion/Documents/sLLM/model_hp'
+os.environ['TRANSFORMERS_CACHE'] = 'D:/Users/Scorpion/Documents/sLLM/model_hp'
+os.environ['HUGGINGFACE_HUB_CACHE'] = 'D:/Users/Scorpion/Documents/sLLM/model_hp'
+#os.environ['HUGGINGFACEHUB_API_TOKEN'] = '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'
+
+def get_llm(model_id="gpt2",gpu=-1,model_config={
+        "max_length": 8000,
+        "temperature": 0.1,
+        "top_k": 250,
+        "top_p": 0.5,
+    }):
+    model_id = model_id
+    tokenizer = AutoTokenizer.from_pretrained(model_id,cache_dir="D:/Users/Scorpion/Documents/sLLM/model_hp")
+    tokenizer.pad_token = tokenizer.eos_token
+    model = AutoModelForCausalLM.from_pretrained(model_id,cache_dir="D:/Users/Scorpion/Documents/sLLM/model_hp")
+    pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, max_new_tokens=1000,model_kwargs=model_config)
+    llm = HuggingFacePipeline(pipeline=pipe)
+    return llm
+
+def get_index(): #애플리케이션에서 사용할 인메모리 벡터 저장소를 생성하고 반환합니다.
+    embeddings = HuggingFaceEmbeddings(
+        model_name="jhgan/ko-sroberta-multitask" , encode_kwargs={'normalize_embeddings': True}
+    )
+    pdf_path = "뉴스기사.pdf" #이 이름을 가진 로컬 PDF 파일을 가정합니다.
+    loader = PyPDFLoader(file_path=pdf_path) #PDF 파일 로드하기
+    text_splitter = RecursiveCharacterTextSplitter( #텍스트 분할기 만들기
+        separators=["\n\n", "\n", ".", " "], #(1) 단락, (2) 줄, (3) 문장 또는 (4) 단어 순서로 청크를 분할합니다.
+        chunk_size=1000, #위의 구분 기호를 사용하여 1000자 청크로 나눕니다.
+        chunk_overlap=100 #이전 청크와 겹칠 수 있는 문자 수입니다.
+    )
+    index_creator = VectorstoreIndexCreator( #벡터 스토어 팩토리 만들기
+        vectorstore_cls=FAISS, #데모 목적으로 인메모리 벡터 저장소를 사용합니다.
+        embedding=embeddings, #Titan 임베딩 사용
+        text_splitter=text_splitter, #재귀적 텍스트 분할기 사용하기
+    )
+    index_from_loader = index_creator.from_loaders([loader]) #로드된 PDF에서 벡터 스토어 인덱스를 생성합니다.
+    return index_from_loader #클라이언트 앱에서 캐시할 인덱스를 반환합니다.
+
+def get_memory(): #이 채팅 세션을 위한 메모리 만들기
+    memory = ConversationBufferWindowMemory(memory_key="chat_history", return_messages=True) #이전 메시지의 기록을 유지합니다.
+    return memory
+
+'''Return Conversational RetrievalChain''' 
+def get_CRChain(memory, index): 
+    llm = get_llm(model_id="LDCC/LDCC-SOLAR-10.7B")
+    return ConversationalRetrievalChain.from_llm(llm, index.vectorstore.as_retriever(), memory=memory)
+
+index = get_index()
+memory = get_memory()
+# Converation With Retrieval
+cr = get_CRChain(memory, index)
+
+chat_response = cr({"question": "분할목돈지원이 뭔가요?"})
+print(chat_response)
