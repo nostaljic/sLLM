@@ -1,40 +1,46 @@
-'''DopeorNope/Ko-Mixtral-v1.4-MoE-7Bx2'''
-# Load model directly
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+
+# CUDA 사용 가능한 GPU가 있는지 확인하고, 사용 가능한 GPU 개수를 확인합니다.
+if torch.cuda.is_available():
+    n_gpu = torch.cuda.device_count()
+    print(f"Number of GPUs available: {n_gpu}")
+    device = torch.device("cuda")
+else:
+    raise SystemError("CUDA is not available. This script requires a GPU environment.")
+
+repo = "MarkrAI/RAG-KO-Mixtral-7Bx2-v2.1"
+markrAI_RAG_tokenizer = AutoTokenizer.from_pretrained(repo)
+
+# 모델을 불러오고 DataParallel을 사용해 모델을 여러 GPU에 분배합니다.
+markrAI_RAG = AutoModelForCausalLM.from_pretrained(
+    repo,
+    return_dict=True,
+    torch_dtype=torch.float16
+)
+markrAI_RAG = torch.nn.DataParallel(markrAI_RAG).to(device)
 
 prompt = '''
 주어진 정보를 기반으로 질문에 답하세요. 답을 모른다면 답을 지어내지 말고 그냥 모른다고 말하세요.
 정보:
-3월 20일에 후속곡 〈Love Love Love〉의 뮤직비디오 티져를 공개하며 곡을 전환해 활동하기 시작한 에픽하이는 이 곡으로 2007년 하반기까지 활동을 이어갔으며, 이 곡은 타이틀 곡인 〈Fan〉의 인기를 이으며 김태희가 모델로 나온 휴대폰 싸이언의 광고 음악으로 쓰여 화제가 되었다. 후속곡 활동까지 성공적으로 활동을 끝마친 에픽하이는 가수 케이윌과 함께 삼성전자의 프로젝트 디지털 싱글인 《Music is My Life》에 참여해 〈Music〉를 발표했다. 이어서 에픽하이의 전국 투어를 치르고 서태지의 15주년 기념 공연(& Seotaiji 15th Anniversary#활동)에 참여하였다. 에픽하이 활동과는 별개로 타블로는 보아, 시아준수, 진보라와 함께 애니콜의 프로젝트 밴드인 애니밴드에서 멤버 및 작곡가로 합류해 활동했고, 동료 뮤지션 페니(페니 (음악가))(Pe2ny)와 함께 이터널 모닝을 결성해 인스트루멘탈(연주곡) 음반인 《Eternal Morning: Sound Track To A Lost Film》을 발매하였다. 《Remapping The Human Soul》은 전작들과는 달리 무겁고 음침한 분위기에서 트랙을 이끌어간다. DJ 투컷이 프로듀싱을 담당한 1CD The Brain은 정부와 신에 대한 불신("Nocturne", 〈희생양〉), 살인을 저지른 남자의 이야기(〈피해망상 Pt.1〉) 안락사로 유명한 잭 케보키언에 대한 부제가 붙은 곡("Mr.Doctor") 등 대중적으로 다루기 무거운 곡들이 배치되어있고, 타블로가 담당한 2CD The Heart는 버림받은 로봇들의 이야기("Broken Toys"), 타블로와 미쓰라 진의 랩이 겹쳐져 이루어진 자살 암시(〈행복합니다〉), 안티팬들을 겨냥한 신랄한 욕설("FAQ")이 담기는 등 전작 《Swan Songs》에서 나타나지 않았던 암흑적이고 어두운 느낌이 음반 전체를 지배한다. 그러면서 〈Fan〉, 〈Love Love Love〉 등에서 중독성 있는 멜로디로 보여준 팝(대중음악)과의 성공적인 조화는 일반 대중이 듣기에 산뜻한 분위기를 담고 있다.
-이에 대한 LTTE의 대응은 정부 주요 인사에 대한 테러, 외국인이 주로 찾는 여행지 버스에 대한 자살폭탄테러, 수도 콜롬보 항에 대한 공격 시도 등 상징적이고 실효적, 시의적절하게 자행되는 테러이다. 결과적으로 갈등의 평화적 해결에 대한 국제적 압박이 정치, 경제적인 면에서 나타나고 있으며, 오히려 스리랑카 정부가 궁지에 몰리는 상황이 전개되고 있다. LTTE는 세계 곳곳에 흩어져 있는 타밀족들로부터 매년 엄청난 자금을 지원받아 투쟁을 지속하고 있다. 그 중 가장 비난받는 것 가운데 하나는 우리 돈으로 10만원에서 25만원 정도를 지불하고 인도 타밀나두 주 불가촉 천민들 가족에게서 여자 아이들을 사서 훈련시켜 자살폭탄 테러에 투입하는 일이다. 그리고 간헐적으로 자금 모집 과정에서 폭력들이 행해지고 있다는 이야기들도 들린다. LTTE에서 이탈해서 정부 측에서 LTTE와 싸우는 Kruna 그룹의 소년병으로 훈련시키기 위한 어린이 납치유괴를 정부 측이 눈감았다는 국제 기구의 조사 또한 진행되고 있다. LTTE의 인권침해는 상대적 약자인 저항적 투쟁체들에서 자주 발생하는 일이라 여길 수도 있지만,LTTE는 자신들의 지역에서 사실상 하나의 국가로서 기능하고 있다.
-호모 에렉투스(Homo erectus)는 신생대 제4기 홍적세(플라이스토세)에 살던 멸종된 화석인류이다. "슬프고 우울한 표정에 납작한 코"를 가진 호모 에렉투스는 아프리카를 떠난 최초의 인간이었다. 170만 년 전에서 10만 년 전에 아프리카, 아시아, 시베리아, 인도네시아 등에 걸쳐서 생존하였다. 조지아의 드마니시를 비롯해 아시아 본토에서도 호모 에렉투스의 유골이 발견되었다.(호모 게오르기쿠스)  대략 150만 년 전 이전에 히말라야 산맥을 넘어 아시아까지 진출하였던 것으로 추정된다. 호모 에렉투스는 뗀석기로 매머드와 같은 큰 짐승을 사냥하거나 가죽을 벗기고 살점을 잘라 냈던 것으로 보인다. 언어를 사용하기 시작했을 것이고, 고기를 불로 익혀 먹음으로써 단백질을 풍부하게 섭취할 수 있었을 것이다. 이러한 여러 변화는 그들의 두뇌가 발달할 수 있는 좋은 조건으로 작용하였을 것이며, 그들의 두개골 용적이 1,000cc 전후로 커진 점은 이러한 주장을 뒷받침하는 한 증거라고 할 것이다.
-김포 도시철도(金浦都市鐵道)는 경기도 김포시 내 한강신도시 광역교통대책의 일환으로 건설된 도시철도 노선으로, 양촌역에서 김포공항역을 잇는 도시철도 노선이다. 당초에는 민선 3기 김동식 전 김포시장에 의하여 서울 지하철 5호선 연장 사업으로 추진될 예정이었으나, 당시 서울특별시 도시철도공사가 양촌읍에 차량기지 건설을 요구하여 무산되었고, 이후 고가 경전철 사업으로 추진되다가 대한민국 제4회 지방 선거에서 강경구 전 김포시장이 당선되면서 중전철 사업으로 계획이 변경되었다. 하지만 예산 문제로 인해 다시 고가 경전철 사업으로 추진해 착공하려 했다. 하지만 대한민국 제5회 지방 선거에서 서울 지하철 9호선 연장을 공약으로 내걸었던 유영록 현 김포시장이 당선되면서 중전철로 계획이 변경되었으나, 서울특별시가 김포시와 협상 과정에서 열차 증결 문제로 8량 기준 역사로 건설해야 한다고 주장하였고, 한 역당 100억이 넘는 추가 금액이 발생하는 것으로 예상되어 4량을 기준으로 한 별도의 중전철 노선으로 추진하게 되었으나, 이것마저 예산 문제로 인해 다시 지하 경전철 사업으로 재추진하여 2014년 3월 26일 착공, 2018년 11월 개통 예정이다. 김포도시철도를 고가 경전철로 건설하는 것에 대하여 김포시와 김포시민 사이에서 논란이 발생하였다. 일부 시민들은 경전철의 수용 능력이 김포 시내의 교통 수요를 감당할 수 있는지에 대한 의구심과 고가 방식으로 건설되는 것 때문에 반대하였었다. 시민들은 김포시의 현재 인구 규모와 시민의 대부분이 서울(서울특별시)로 통근하는 점을 미루어 볼 때, 다른 수도권 전철과 동일한 표준궤의 중전철이 필요하다고 주장하였다.
-2004년 8월 23일 국회는 김영란 대법관 후보에 대한 임명안을 통과시켰다. 이로 인해 김영란은 대한민국에서 최초의 여성 대법관이 되었고, 1982년 이후 22년만에 40대 대법관이 되었다. 사법연수원 11기 김영란은 대법관 임명 당시 만 48세의 젊은 여성으로, 사법연수원 2, 3기 출신들이 거론되던 대법관 자리에 60여 명의 선배들을 제치고 임명되었기 때문에 이 인사는 파격적인 것이었다. 김영란은 인사 청문회에서는 사형제 폐지에 찬성했으나, 2006년 살인죄로 기소된 피고인에 사형을 선고했다. 또 환경권을 이유로 공사를 중지할 수 없다는 기존의 판례를 그대로 따라 천성산 터널공사 중단 가처분 신청을 기각했다. 2011년 10월 27일(현지시간), 김영란은 남아프리카공화국 수도 프리토리아에서 툴리 마돈셀라 국민권익보호원장을 만나 양 기관 간 우호협력 방안에 대해 협의했다. 일명 '김영란법'으로 명명된 《부정청탁 및 금품등 수수의 금지에 관한 법률》안은 2년 반이라는 오랜 논의를 거쳐 2015년 1월 8일 국회(대한민국 국회) 정무위원회를 통과하였으며 같은 해 3월 3일에 국회 본회의를 통과하여 1년 6개월의 유예기간을 거친 후 시행될 예정이다.
 
 질문:
-호모 에렉투스가 처음으로 언어를 사용하기 시작한 정확한 시점은 언제인가요?
 
 답변:
 '''
 
-tokenizer1 = AutoTokenizer.from_pretrained("DopeorNope/Ko-Mixtral-v1.4-MoE-7Bx2")
-model1 = AutoModelForCausalLM.from_pretrained(
-    "DopeorNope/Ko-Mixtral-v1.4-MoE-7Bx2"
-    ,device_map="auto"
-    ,torch_dtype=torch.float16,
-)
-
-inputs1 = tokenizer1(prompt, return_tensors="pt").to("mps")
-generated_ids1 = model1.generate(
-    **inputs1,
+# GPU로 데이터를 보냅니다.
+inputs = markrAI_RAG_tokenizer(prompt, return_tensors="pt").to(device)
+generated_ids = markrAI_RAG.module.generate(
+    **inputs,
     num_return_sequences=1,
-    eos_token_id=100001,
-    pad_token_id=100001,
+    eos_token_id=markrAI_RAG_tokenizer.eos_token_id,
+    pad_token_id=markrAI_RAG_tokenizer.pad_token_id,
     max_new_tokens=400,
     do_sample=False,
     num_beams=1,
 )
 
-outputs1 = tokenizer1.batch_decode(generated_ids1, skip_special_tokens=True)
-print(outputs1[0])
+# 결과를 CPU로 옮기고 디코딩합니다.
+outputs = markrAI_RAG_tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+print(outputs[0])
