@@ -1,40 +1,45 @@
-import os
 import torch
-from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-def main(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
-    torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
+# 분산 설정을 위한 람다 함수 정의
+def run_ddp(rank, world_size):
+    # 분산 환경 설정
+    torch.distributed.init_process_group(
+        backend='nccl',
+        init_method='tcp://localhost:23456',
+        world_size=world_size,
+        rank=rank
+    )
 
     # 모델과 토크나이저 로드
     repo = "MarkrAI/RAG-KO-Mixtral-7Bx2-v2.1"
     tokenizer = AutoTokenizer.from_pretrained(repo)
-    model = AutoModelForCausalLM.from_pretrained(repo, return_dict=True, torch_dtype=torch.float16)
-    
-    model.to(rank)
-    ddp_model = DDP(model, device_ids=[rank])
+    model = AutoModelForCausalLM.from_pretrained(
+        repo,
+        return_dict=True,
+        torch_dtype=torch.float16
+    ).to(rank)
 
-    # 여기에 모델을 사용하는 코드 추가
-    # 예: 모델로부터 출력을 생성하고 출력을 인쇄
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[rank])
+
+    # 모델 사용 예제
     prompt = "Your prompt here"
     inputs = tokenizer(prompt, return_tensors="pt").to(rank)
     with torch.no_grad():
-        generated_ids = ddp_model.module.generate(
-            **inputs,
-            max_length=50,  # 출력의 최대 길이 설정
-            num_beams=5,    # 빔 서치의 빔 수 설정
-            temperature=1.0 # 샘플링 온도 설정
-        )
+        generated_ids = model.module.generate(**inputs, max_length=50, num_beams=5, temperature=1.0)
     generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-    print(generated_texts)
+    if rank == 0:  # 메인 프로세스에서만 출력
+        print(generated_texts)
 
+    # 분산 환경 정리
     torch.distributed.destroy_process_group()
 
+# 메인 함수에서 분산 작업 시작
 if __name__ == "__main__":
     world_size = 2  # 사용할 GPU 수
-    torch.multiprocessing.spawn(main,
-                                args=(world_size,),
-                                nprocs=world_size,
-                                join=True)
+    torch.multiprocessing.spawn(
+        lambda rank: run_ddp(rank, world_size),
+        args=(world_size,),
+        nprocs=world_size,
+        join=True
+    )
